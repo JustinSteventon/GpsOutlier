@@ -1,10 +1,20 @@
 QT += core
 QT -= gui
-
-!host_build: QMAKE_MAC_SDK = macosx10.11
-
+  
+QMAKE_MAC_SDK = macosx10.11
+CONFIG += console c++11
+CONFIG -= add_bundle
+TEMPLATE = app
 TARGET = gpsoutlier
 
-SOURCES += main.cpp
+SOURCES += main.cpp \
+    Complex.cpp \
+    Math.cpp \
+    Outlier.cpp
+
+HEADERS += Complex.hpp \
+    Math.hpp \
+    Util.hpp \
+    Outlier.hpp
 
   
