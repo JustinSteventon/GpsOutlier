@@ -2,6 +2,10 @@
 #include "fxNMEA.h"
 #include "fxUtils.h"
 
+#define ACCURACY_THRESHOLD 100
+#define SPEED_THRESHOLD 100
+#define DISTANCE_THRESHOLD 100
+
 class GpsFilter
 {
     UINT _minAccuracy, _minReadings, _maxSpeed;
@@ -94,6 +98,12 @@ bool ParseNmeaFile(CHAR *fileName, TList<FXGPS*> &gpsList)
     return TRUE;
 }
 
+DOUBLE distance(FXGPS* gps1, FXGPS* gps2) {
+    DOUBLE d1 = sqrt(pow(gps1->Position.Longitude,2) + pow(gps1->Position.Latitude,2));
+    DOUBLE d2 = sqrt(pow(gps2->Position.Longitude,2) + pow(gps2->Position.Latitude,2));
+    return fabs(d1-d2);
+}
+
 VOID AnalyzeData(TList<FXGPS*> &gpsList)
 {
     // We need to evalate the dataset provided and see how well the algorithm works.
@@ -103,18 +113,75 @@ VOID AnalyzeData(TList<FXGPS*> &gpsList)
     //
 
     GpsFilter gpsFilter;
+    DOUBLE d[3] = {
+                    distance(gpsList.Get(0), gpsList.Get(1)),
+                    distance(gpsList.Get(1), gpsList.Get(2)),
+                    distance(gpsList.Get(2), gpsList.Get(3))
+                  };
+    DOUBLE a[3] = {
+                    gpsList.Get(0)->Position.Accuracy,
+                    gpsList.Get(1)->Position.Accuracy,
+                    gpsList.Get(2)->Position.Accuracy
+                  };
+    DOUBLE s[3] = {
+                    gpsList.Get(0)->Speed,
+                    gpsList.Get(1)->Speed,
+                    gpsList.Get(2)->Speed
+                  };
 
-    for (UINT i = 0; i < gpsList.GetCount(); i++)
+
+
+    for (UINT i = 3; i < gpsList.GetCount(); i++)
     {
+        //Calc deltas
+        DOUBLE dd = (d[0] + d[1] + d[2]) / 3;
+        DOUBLE da = (a[0] + a[1] + a[2]) / 3;
+        DOUBLE ds = (s[0] + s[1] + s[2]) / 3;
+
         FXGPS *gps = gpsList.Get(i);
-        qDebug("Lat=%f, Lon=%f, PDOP=%f, Speed=%f", gps->Position.Latitude, gps->Position.Longitude, gps->Position.Accuracy, gps->Speed);
+        FXGPS *prevGps = gpsList.Get( i-1 );
+        if ( /*gps->Position.Accuracy / ACCURACY_THRESHOLD > da  &&*/
+             ds >= gps->Speed / SPEED_THRESHOLD &&
+             dd >= distance(prevGps, gps) / DISTANCE_THRESHOLD) {
+            qDebug(" dD=%f dA=%f dS=%f Lat=%f, Lon=%f, PDOP=%f, Speed=%f",dd, da, ds, gps->Position.Latitude, gps->Position.Longitude, gps->Position.Accuracy, gps->Speed);
+
+            //shifting ahead
+            d[0] = d[1];
+            d[1] = d[2];
+            d[2] = distance(prevGps,gps);
+
+            s[0] = s[1];
+            s[1] = s[2];
+            s[2] = gps->Speed;
+
+            a[0] = a[1];
+            a[1] = a[2];
+            a[2] = gps->Position.Accuracy;
+
+        }else{
+            qDebug("SKIPED: dD=%f dA=%f dS=%f Lat=%f, Lon=%f, PDOP=%f, Speed=%f",dd,da,ds, gps->Position.Latitude, gps->Position.Longitude, gps->Position.Accuracy, gps->Speed);
+            d[0] = d[1];
+            d[1] = d[2];
+            d[2] = dd;
+
+            s[0] = s[1];
+            s[1] = s[2];
+            s[2] = ds;
+
+            a[0] = a[1];
+            a[1] = a[2];
+            a[2] = da;
+        }
+
+
+
     }
 }
 
 int main(int argc, char *argv[])
 {
     TList<FXGPS *> gpsList;
-    if (!ParseNmeaFile("e:\\github\\GpsOutlier\\data\\Juno NMEA 2015-Sep-3 06-20-24PM.nmea", gpsList)) {
+    if (!ParseNmeaFile("../data/Juno NMEA 2015-Sep-3 06-20-24PM.nmea", gpsList)) {
         return -1;
     }
 

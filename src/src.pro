@@ -4,7 +4,7 @@ QT -= gui
 TARGET = src
 CONFIG += console
 CONFIG -= app_bundle
-
+QMAKE_MAC_SDK = macosx10.11
 DEFINES += QTBUILD
 
 QMAKE_CXXFLAGS += -Wno-unknown-pragmas
